@@ -1,4 +1,5 @@
 import os
+import requests
 
 from dotenv import load_dotenv
 from telegram import Update
@@ -13,6 +14,7 @@ from telegram.ext import (
 
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
+API_KEY = os.getenv("API_KEY")
 
 UPLOAD_PHOTO = range(1)
 
@@ -31,10 +33,27 @@ async def reply_with_caption(update: Update, context: ContextTypes.DEFAULT_TYPE)
     """Reply the user photo with a caption."""
     # Stores the photo in the context
     photo_file = await update.message.photo[-1].get_file()
+    photo_path = photo_file.file_path
     await photo_file.download_to_drive("data/user_photo.jpg")
 
-    await update.message.reply_text("Nice picture!")
-    await update.message.reply_photo(update.message.photo[-1])
+    # Sends the photo to the API and gets the caption
+    url = "https://image-caption-generator2.p.rapidapi.com/v2/captions"
+    querystring = {
+        "imageUrl": photo_path,
+        "useEmojis": "true",
+        "useHashtags": "true",
+        "limit": "1",
+        "vibe": "cute",
+    }
+    headers = {
+        "X-RapidAPI-Key": API_KEY,
+        "X-RapidAPI-Host": "image-caption-generator2.p.rapidapi.com",
+    }
+    response = requests.get(url, headers=headers, params=querystring).json()
+    caption = response["captions"][0]
+
+    # Reply the user with the caption
+    await update.message.reply_text(caption)
 
     return ConversationHandler.END
 
