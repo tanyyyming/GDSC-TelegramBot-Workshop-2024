@@ -1,6 +1,7 @@
 # environments
 .env
 venv/
+data/
 
 # OS generated files
 .DS_Store
