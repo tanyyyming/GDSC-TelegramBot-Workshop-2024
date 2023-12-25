@@ -2,7 +2,7 @@ import os
 import requests
 
 from dotenv import load_dotenv
-from telegram import Update
+from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -16,14 +16,34 @@ load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
 API_KEY = os.getenv("API_KEY")
 
-UPLOAD_PHOTO = range(1)
+VIBE, UPLOAD_PHOTO = range(2)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Starts the conversation and ask the user to upload a picture."""
 
+    reply_keyboard = [["happy", "sad"], ["funny", "curious"], ["angry", "cute"]]
+
     await update.message.reply_text(
-        "Hi! Please send the picture you want me to write a caption for."
+        "Hi! Welcome to the Image Captioning Bot! I can caption any image you send me.\n"
+        "Before we start, let's decide what vibe you want the caption to have!",
+        reply_markup=ReplyKeyboardMarkup(
+            reply_keyboard,
+            one_time_keyboard=True,
+            input_field_placeholder="vibe",
+        ),
+    )
+
+    return VIBE
+
+
+async def choose_vibe(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Stores the vibe chosen by the user and asks the user to upload a picture."""
+
+    context.user_data["vibe"] = update.message.text
+    await update.message.reply_text(
+        "Alright! Now send me a picture of your choice!",
+        reply_markup=ReplyKeyboardRemove(),
     )
 
     return UPLOAD_PHOTO
@@ -34,6 +54,7 @@ async def reply_with_caption(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # Stores the photo in the context
     photo_file = await update.message.photo[-1].get_file()
     photo_path = photo_file.file_path
+    vibe = context.user_data["vibe"]
     await photo_file.download_to_drive("data/user_photo.jpg")
 
     # Sends the photo to the API and gets the caption
@@ -43,7 +64,7 @@ async def reply_with_caption(update: Update, context: ContextTypes.DEFAULT_TYPE)
         "useEmojis": "true",
         "useHashtags": "true",
         "limit": "1",
-        "vibe": "cute",
+        "vibe": vibe,
     }
     headers = {
         "X-RapidAPI-Key": API_KEY,
@@ -81,6 +102,7 @@ def main() -> None:
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
+            VIBE: [MessageHandler(filters.TEXT, choose_vibe)],
             UPLOAD_PHOTO: [MessageHandler(filters.PHOTO, reply_with_caption)],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
